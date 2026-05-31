@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colleen James 2026 — Canvassing Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f1923; color: #e8e4dc; height: 100vh; display: flex; flex-direction: column; }
+  #topbar { background: #0C447C; padding: 10px 18px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; border-bottom: 2px solid #185FA5; }
+  #topbar h1 { font-size: 15px; font-weight: 700; color: #fff; }
+  #topbar span { font-size: 11px; color: #B5D4F4; }
+  #controls { background: #162635; padding: 8px 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex-shrink: 0; border-bottom: 1px solid #1e3a52; }
+  .ctrl-label { font-size: 11px; color: #888780; text-transform: uppercase; letter-spacing: 0.06em; }
+  .filter-btn { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; border: 1px solid transparent; cursor: pointer; transition: all 0.15s; }
+  .filter-btn.all     { background: #185FA5; color: #fff; border-color: #185FA5; }
+  .filter-btn.target  { background: #6b1414; color: #fca5a5; border-color: #991b1b; }
+  .filter-btn.defend  { background: #1a3d1a; color: #86efac; border-color: #166534; }
+  .filter-btn.grow    { background: #3d2e08; color: #fcd34d; border-color: #92400e; }
+  .filter-btn.maintain{ background: #2d2d2d; color: #d1d5db; border-color: #4b5563; }
+  .filter-btn.inactive{ opacity: 0.35; }
+  .filter-btn:hover   { opacity: 0.85; }
+  #layout { display: flex; flex: 1; overflow: hidden; }
+  #map { flex: 1; }
+  #sidebar { width: 280px; flex-shrink: 0; background: #162635; border-left: 1px solid #1e3a52; overflow-y: auto; display: flex; flex-direction: column; }
+  #sidebar-header { padding: 12px 14px 8px; border-bottom: 1px solid #1e3a52; background: #0f1f30; }
+  #sidebar-header h2 { font-size: 12px; font-weight: 700; color: #B5D4F4; text-transform: uppercase; letter-spacing: 0.06em; }
+  #ward-list { flex: 1; }
+  .ward-card { padding: 10px 14px; border-bottom: 1px solid #1e3a52; cursor: pointer; transition: background 0.12s; }
+  .ward-card:hover { background: #1e3a52; }
+  .ward-card.selected { background: #1a3a5e; border-left: 3px solid #185FA5; }
+  .ward-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .ward-name { font-size: 12px; font-weight: 700; color: #e8e4dc; }
+  .tier-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .tier-ATARGET  { background: #7f1d1d; color: #fca5a5; }
+  .tier-AGROW    { background: #78350f; color: #fcd34d; }
+  .tier-BDEFEND  { background: #14532d; color: #86efac; }
+  .tier-CMAINTAIN{ background: #374151; color: #d1d5db; }
+  .ward-stats { display: flex; gap: 10px; margin-top: 4px; }
+  .stat { font-size: 10px; color: #888780; }
+  .stat b { color: #B5D4F4; font-weight: 600; }
+  .ward-note { font-size: 10px; color: #6b8fa8; margin-top: 5px; line-height: 1.4; font-style: italic; }
+  #priority-legend { padding: 10px 14px; border-top: 1px solid #1e3a52; background: #0f1f30; }
+  .legend-title { font-size: 10px; color: #888780; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 7px; }
+  .legend-row { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .legend-text { font-size: 10px; color: #B5D4F4; }
+  #totals-bar { background: #0f1923; border-top: 1px solid #1e3a52; padding: 6px 18px; display: flex; gap: 24px; font-size: 11px; flex-shrink: 0; }
+  .total-item { color: #888780; }
+  .total-item b { color: #e8e4dc; }
+  .leaflet-popup-content-wrapper { background: #162635; border: 1px solid #185FA5; border-radius: 6px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+  .leaflet-popup-tip { background: #162635; }
+  .leaflet-popup-content { margin: 12px 14px; color: #e8e4dc; font-family: 'Segoe UI', Arial, sans-serif; min-width: 240px; }
+  .leaflet-popup-close-button { color: #888780 !important; }
+  .popup-ward { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .popup-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; border-bottom: 1px solid #1e3a52; padding-bottom: 3px; }
+  .popup-key { color: #888780; }
+  .popup-val { color: #B5D4F4; font-weight: 600; }
+  .popup-strategy { font-size: 11px; font-weight: 700; margin-top: 8px; padding: 5px 8px; border-radius: 4px; }
+  .s-target  { background: #7f1d1d; color: #fca5a5; }
+  .s-defend  { background: #14532d; color: #86efac; }
+  .s-grow    { background: #78350f; color: #fcd34d; }
+  .s-maintain{ background: #374151; color: #d1d5db; }
+  .popup-note { font-size: 10px; color: #6b8fa8; margin-top: 8px; font-style: italic; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>Colleen James 2026 — Canvassing Map</h1>
+  <span>Regional Councillor · City of Kitchener · Election: Oct 26, 2026</span>
+</div>
+<div id="controls">
+  <span class="ctrl-label">Filter:</span>
+  <button class="filter-btn all"      onclick="filterTier('ALL')">All wards</button>
+  <button class="filter-btn target"   onclick="filterTier('A-TARGET')">A — Target</button>
+  <button class="filter-btn grow"     onclick="filterTier('A-GROW')">A — Grow</button>
+  <button class="filter-btn defend"   onclick="filterTier('B-DEFEND')">B — Defend</button>
+  <button class="filter-btn maintain" onclick="filterTier('C-MAINTAIN')">C — Maintain</button>
+  <span style="margin-left:auto;font-size:11px;color:#6b8fa8;">Click a ward marker for full details</span>
+</div>
+<div id="layout">
+  <div id="map"></div>
+  <div id="sidebar">
+    <div id="sidebar-header"><h2>Ward Priority List</h2></div>
+    <div id="ward-list"></div>
+    <div id="priority-legend">
+      <div class="legend-title">Tier legend</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#ef4444"></div><div class="legend-text">A–Target: High volume / competitive — max effort</div></div>
+      <div class="legend-row"><div class="legend-dot" style="background:#f59e0b"></div><div class="legend-text">A–Grow: Low turnout — mobilise new voters</div></div>
+      <div class="legend-row"><div class="legend-dot" style="background:#22c55e"></div><div class="legend-text">B–Defend: Protect and maintain Colleen's base</div></div>
+      <div class="legend-row"><div class="legend-dot" style="background:#6b7280"></div><div class="legend-text">C–Maintain: Safe ward — baseline canvass only</div></div>
+    </div>
+  </div>
+</div>
+<div id="totals-bar">
+  <div class="total-item">Total precincts: <b>148</b></div>
+  <div class="total-item">2022 ballots: <b>34,658</b></div>
+  <div class="total-item">Colleen 2022: <b>13,519 votes (1st of 14)</b></div>
+  <div class="total-item">Election day: <b>Oct 26, 2026</b></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var WARDS = [
+  { id:1,  name:"Ward 1",  precincts:14, ballots:3603, priority:5,  tier:"A-TARGET",   color:"#ef4444", lat:43.418, lng:-80.442, untapped:470, strategy:"Davey won 68.7%. Suburban — likely favourable to Colleen's profile.", note:"Suburban, stable. Protect base. 2–3 canvass rounds." },
+  { id:2,  name:"Ward 2",  precincts:18, ballots:4277, priority:4,  tier:"B-DEFEND",   color:"#22c55e", lat:43.453, lng:-80.508, untapped:558, strategy:"Schnider won 82%. Voters engaged with local politics. Strong contact opportunity.", note:"High engagement. Voters know their councillor — good for direct contact." },
+  { id:3,  name:"Ward 3",  precincts:13, ballots:1916, priority:10, tier:"A-GROW",     color:"#f59e0b", lat:43.433, lng:-80.455, untapped:250, strategy:"LOWEST TURNOUT citywide. 6-candidate split. Untapped voter base.", note:"Lowest turnout in Kitchener. Every new vote here is gold." },
+  { id:4,  name:"Ward 4",  precincts:14, ballots:2960, priority:7,  tier:"B-DEFEND",   color:"#22c55e", lat:43.402, lng:-80.468, untapped:386, strategy:"Mixed demographics. Michaud won 57.9%. Mid-priority defend.", note:"Mixed demographics. Competitive city race means engaged voters." },
+  { id:5,  name:"Ward 5",  precincts:14, ballots:2841, priority:8,  tier:"A-GROW",     color:"#f59e0b", lat:43.390, lng:-80.490, untapped:370, strategy:"LOW TURNOUT. 5-way race = disengaged voters. Mobilising +200 votes matters.", note:"Community events + phone bank to mobilise new voters." },
+  { id:6,  name:"Ward 6",  precincts:14, ballots:2888, priority:9,  tier:"B-DEFEND",   color:"#22c55e", lat:43.450, lng:-80.490, untapped:376, strategy:"Singh won 74.9%. Urban core, denser. Lower absolute volume.", note:"Urban core. Dense but lower ballot volume. Defend." },
+  { id:7,  name:"Ward 7",  precincts:17, ballots:4057, priority:2,  tier:"A-TARGET",   color:"#ef4444", lat:43.415, lng:-80.517, untapped:529, strategy:"High volume. 3-way race, Ioannidis won 41.6%. Swing area.", note:"Competitive 3-way city race. Suburban mix. Persuadable voters." },
+  { id:8,  name:"Ward 8",  precincts:14, ballots:3180, priority:6,  tier:"C-MAINTAIN", color:"#6b7280", lat:43.397, lng:-80.433, untapped:414, strategy:"Johnston won 88.3%. Very safe incumbent ward. Baseline canvass only.", note:"Safe incumbent ward. Don't over-invest here." },
+  { id:9,  name:"Ward 9",  precincts:16, ballots:3914, priority:3,  tier:"B-DEFEND",   color:"#22c55e", lat:43.443, lng:-80.453, untapped:510, strategy:"Chapman 59.9%. NDP-leaning. NDP provincial collapse = movable voters.", note:"NDP voters persuadable for Colleen after 2025 collapse." },
+  { id:10, name:"Ward 10", precincts:14, ballots:5022, priority:1,  tier:"A-TARGET",   color:"#ef4444", lat:43.467, lng:-80.473, untapped:655, strategy:"HIGHEST VOLUME. Clancy 36.2%, Stretch 33.8%. Key battleground. Student/young professional population.", note:"Highest ballot volume. Tight split = persuadable voters. #1 priority." }
+];
+
+var tierKey = { "A-TARGET":"ATARGET", "A-GROW":"AGROW", "B-DEFEND":"BDEFEND", "C-MAINTAIN":"CMAINTAIN" };
+var stratClass = { "A-TARGET":"s-target", "A-GROW":"s-grow", "B-DEFEND":"s-defend", "C-MAINTAIN":"s-maintain" };
+
+var map = L.map('map', { center:[43.430,-80.475], zoom:12 });
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
+}).addTo(map);
+
+var markers = {};
+
+function makeIcon(w) {
+  var sz = w.tier.startsWith('A') ? 36 : 30;
+  return L.divIcon({
+    className:'',
+    html:'<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+w.color+';border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:'+(sz>30?13:11)+'px;font-weight:800;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.5);font-family:Segoe UI,Arial,sans-serif;">'+w.priority+'</div>',
+    iconSize:[sz,sz], iconAnchor:[sz/2,sz/2]
+  });
+}
+
+function popupHTML(w) {
+  return '<div class="popup-ward">'+w.name+'</div>'+
+    '<div class="popup-row"><span class="popup-key">Canvass priority</span><span class="popup-val">#'+w.priority+' of 10</span></div>'+
+    '<div class="popup-row"><span class="popup-key">Precincts</span><span class="popup-val">'+w.precincts+'</span></div>'+
+    '<div class="popup-row"><span class="popup-key">2022 ballots</span><span class="popup-val">'+w.ballots.toLocaleString()+'</span></div>'+
+    '<div class="popup-row"><span class="popup-key">Est. untapped voters</span><span class="popup-val">~'+w.untapped+'</span></div>'+
+    '<div class="popup-strategy '+stratClass[w.tier]+'">'+w.tier+': '+w.strategy+'</div>'+
+    '<div class="popup-note">'+w.note+'</div>';
+}
+
+WARDS.forEach(function(w) {
+  var m = L.marker([w.lat, w.lng], { icon: makeIcon(w) })
+    .addTo(map)
+    .bindPopup(popupHTML(w), { maxWidth:300 });
+  m.on('click', function(){ highlightCard(w.id); });
+  markers[w.id] = m;
+});
+
+// Build sidebar
+var sorted = WARDS.slice().sort(function(a,b){ return a.priority - b.priority; });
+var list = document.getElementById('ward-list');
+sorted.forEach(function(w) {
+  var d = document.createElement('div');
+  d.className = 'ward-card';
+  d.id = 'card-'+w.id;
+  d.innerHTML =
+    '<div class="ward-top">'+
+      '<div class="ward-name">#'+w.priority+' — '+w.name+'</div>'+
+      '<span class="tier-badge tier-'+tierKey[w.tier]+'">'+w.tier+'</span>'+
+    '</div>'+
+    '<div class="ward-stats">'+
+      '<div class="stat">Precincts: <b>'+w.precincts+'</b></div>'+
+      '<div class="stat">Ballots: <b>'+w.ballots.toLocaleString()+'</b></div>'+
+      '<div class="stat">Untapped: <b>~'+w.untapped+'</b></div>'+
+    '</div>'+
+    '<div class="ward-note">'+w.strategy+'</div>';
+  d.addEventListener('click', function(){
+    map.setView([w.lat, w.lng], 13);
+    markers[w.id].openPopup();
+    highlightCard(w.id);
+  });
+  list.appendChild(d);
+});
+
+function highlightCard(id) {
+  document.querySelectorAll('.ward-card').forEach(function(c){ c.classList.remove('selected'); });
+  var c = document.getElementById('card-'+id);
+  if (c) { c.classList.add('selected'); c.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+}
+
+function filterTier(tier) {
+  document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.add('inactive'); });
+  var sel = tier==='ALL'?'all': tier==='A-TARGET'?'target': tier==='A-GROW'?'grow': tier==='B-DEFEND'?'defend':'maintain';
+  var btn = document.querySelector('.filter-btn.'+sel);
+  if (btn) btn.classList.remove('inactive');
+  WARDS.forEach(function(w) {
+    var show = tier==='ALL' || w.tier===tier;
+    if (show && !map.hasLayer(markers[w.id])) markers[w.id].addTo(map);
+    if (!show && map.hasLayer(markers[w.id])) map.removeLayer(markers[w.id]);
+    var card = document.getElementById('card-'+w.id);
+    if (card) card.style.display = show ? '' : 'none';
+  });
+}
+</script>
+</body>
+</html>
